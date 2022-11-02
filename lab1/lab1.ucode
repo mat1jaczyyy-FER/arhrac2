@@ -28,7 +28,7 @@
     // (ri <- rj + rk)
     opcode[2]:
         ri_sel, rj_sel, rk_sel, alu_sel=ADD,
-        if m_7 then goto N.1 else goto N.0 endif;
+            if m_7 then goto N.1 else goto N.0 endif;
 
     // HALT
     opcode[3]:
@@ -63,7 +63,7 @@
     // (ri <- rj - rk)
     opcode[9]:
         ri_sel, rj_sel, rk_sel, c_in, alu_sel=SUB,
-        if m_7 then goto N.1 else goto N.0 endif;
+            if m_7 then goto N.1 else goto N.0 endif;
 
     // SHL ri, rj
     // (ri <- rj << 1)
@@ -94,6 +94,12 @@
     // (PC <- MEM(SP), SP <- SP + 1)
     opcode[15]:
         a_sel=5, alu_sel=ADDA, mar_sel=LOAD, goto ret;
+    
+    // CNTZR ri, (rk)
+    // (ri <- count_zeros(MEM(rk)))
+    // NOTE: Will destroy SP (r5) and SR (r6)!
+    opcode[16]:
+        a_sel=4, b_sel=4, alu_sel=XOR, r4_write, goto cntzr;            // r4 <- 0
 
 ////// opcode extensions
 
@@ -129,7 +135,7 @@
     // shift left by adding with itself
     shl:
         ri_sel, rj_sel, b_sel=4, alu_sel=ADD,
-        if m_7 then goto N.1 else goto N.0 endif;
+            if m_7 then goto N.1 else goto N.0 endif;
 
     // pop value from stack
     pop:
@@ -147,3 +153,24 @@
     ret:
         mdr_sel=LOAD_MEM, read, if wait then goto ret endif;
         result_sel=mdr, r7_write, goto pop.up;
+
+    // count zeros in byte of memory
+    cntzr:
+        a_sel=4, c_in, alu_sel=ADDA, r6_write;                          // r6 <- 1
+        a_sel=4, rk_sel, alu_sel=OR, mar_sel=LOAD;                      // mar <- rk
+    cntzr.reading:
+        mdr_sel=LOAD_MEM, read, if wait then goto cntzr.reading endif;  // mdr <- MEM(mar)
+        result_sel=mdr, r4_write;                                       // r4 <- mdr
+        a_sel=4, b_sel=4, alu_sel=XOR, mdr_sel=LOAD_ALU;                // mdr <- 0
+    cntzr.check:
+        a_sel=4, b_sel=6, alu_sel=AND, r5_write;                        // r5 <- r4 AND r6
+        a_sel=5, alu_sel=SUBA,                                          // r5 + 255
+            if c_out then goto cntzr.next else goto cntzr.0 endif;      // r5 == 0? cntzr.0 : cntzr.next;
+    cntzr.0:
+        result_sel=mdr, r5_write;                                       // r5 <- mdr
+        a_sel=5, c_in, alu_sel=ADDA, mdr_sel=LOAD_ALU;                  // mdr += 1
+    cntzr.next:
+        a_sel=6, b_sel=6, alu_sel=ADD, r6_write,                        // r6 <- r6 << 1
+            if c_out then goto cntzr.end else goto cntzr.check endif;   // r6 == 0? cntzr.end : cntzr.check;
+    cntzr.end:
+        result_sel=mdr, ri_sel, goto fetch;                             // ri <- mdr
