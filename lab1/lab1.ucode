@@ -1,0 +1,149 @@
+////// fetch
+
+    // (IR_high <- MEM(PC), PC <- PC + 1)
+    fetch:
+        a_sel=7, alu_sel=ADDA, mar_sel=LOAD;
+    fetch.high:
+        ir1_sel=LOAD, read, if wait then goto fetch.high endif;
+        a_sel=7, c_in, alu_sel=ADDA, r7_write;
+
+    // (IR_low <- MEM(PC), PC <- PC + 1)
+        a_sel=7, alu_sel=ADDA, mar_sel=LOAD;
+    fetch.low:
+        ir0_sel=LOAD, read, if wait then goto fetch.low endif;
+        a_sel=7, c_in, alu_sel=ADDA, r7_write, goto opcode[ir_opcode];
+
+////// opcodes
+
+    // NOP
+    opcode[0]:
+        goto fetch;
+
+    // LOAD_IMMEDIATE ri, konst
+    // (ri <- ir_const8)
+    opcode[1]:
+        result_sel=ir_const8, ri_sel, goto fetch;
+
+    // ADD ri, rj, rk
+    // (ri <- rj + rk)
+    opcode[2]:
+        ri_sel, rj_sel, rk_sel, alu_sel=ADD,
+        if m_7 then goto N.1 else goto N.0 endif;
+
+    // HALT
+    opcode[3]:
+        goto opcode[3];
+
+    // MOVE ri, rj
+    // (ri <- rj)
+    opcode[4]:
+        ri_sel, rj_sel, alu_sel=ADDA, goto fetch; 
+
+    // LOAD ri, addr
+    // (ri <- MEM(ir_const8))
+    opcode[5]:
+        result_sel=ir_const8, r4_write, goto load;
+
+    // STORE rj, (rk)
+    // (MEM(rk) <- rj)
+    opcode[6]:
+        a_sel=4, b_sel=4, alu_sel=XOR, r4_write, goto store;
+
+    // JMP addr
+    // (PC <- ir_const8)
+    opcode[7]:
+        result_sel=ir_const8, r7_write, goto fetch;
+
+    // JZ rj, rk
+    // (if rj == 0 then PC <- rk)
+    opcode[8]:
+        rj_sel, alu_sel=SUBA, if c_out then goto fetch else goto jz endif;
+
+    // SUB ri, rj, rk
+    // (ri <- rj - rk)
+    opcode[9]:
+        ri_sel, rj_sel, rk_sel, c_in, alu_sel=SUB,
+        if m_7 then goto N.1 else goto N.0 endif;
+
+    // SHL ri, rj
+    // (ri <- rj << 1)
+    opcode[10]:
+        rj_sel, alu_sel=ADDA, r4_write, goto shl;
+
+    // LDSP konst
+    // (SP <- ir_const8)
+    opcode[11]:
+        result_sel=ir_const8, r5_write, goto fetch;
+
+    // PUSH rj
+    // (SP <- SP - 1, MEM(SP) <- rj)
+    opcode[12]:
+        a_sel=5, alu_sel=SUBA, r5_write, mar_sel=LOAD, goto store.rj;
+
+    // POP ri
+    // (ri <- MEM(SP), SP <- SP + 1)
+    opcode[13]:
+        a_sel=5, alu_sel=ADDA, mar_sel=LOAD, goto pop;
+
+    // CALL addr
+    // (SP <- SP - 1, MEM(SP) <- PC, PC <- ir_const8)
+    opcode[14]:
+        a_sel=5, alu_sel=SUBA, r5_write, mar_sel=LOAD, goto call;
+
+    // RET
+    // (PC <- MEM(SP), SP <- SP + 1)
+    opcode[15]:
+        a_sel=5, alu_sel=ADDA, mar_sel=LOAD, goto ret;
+
+////// opcode extensions
+
+    // set flag N
+    N.1:
+        a_sel=4, b_sel=4, alu_sel=XOR, r4_write;
+        a_sel=4, b_sel=4, c_in, alu_sel=ADDA, r6_write, goto fetch;
+
+    // clear flag N
+    N.0:
+        a_sel=6, b_sel=6, alu_sel=XOR, r6_write, goto fetch;
+
+    // load from memory
+    load:
+        a_sel=4, alu_sel=ADDA, mar_sel=LOAD;
+    load.reading:
+        mdr_sel=LOAD_MEM, read, if wait then goto load.reading endif;
+        result_sel=mdr, ri_sel, goto fetch;
+    
+    // store to memory
+    store:
+        a_sel=4, rk_sel, alu_sel=OR, mar_sel=LOAD;
+    store.rj:
+        rj_sel, alu_sel=ADDA, mdr_sel=LOAD_ALU;
+    store.writing:
+        write, if wait then goto store.writing else goto fetch endif;
+
+    // zero found, jump to rk
+    jz:
+        a_sel=4, b_sel=4, alu_sel=XOR, r4_write;
+        a_sel=4, rk_sel, alu_sel=OR, r7_write, goto fetch;
+
+    // shift left by adding with itself
+    shl:
+        ri_sel, rj_sel, b_sel=4, alu_sel=ADD,
+        if m_7 then goto N.1 else goto N.0 endif;
+
+    // pop value from stack
+    pop:
+        mdr_sel=LOAD_MEM, read, if wait then goto pop endif;
+        result_sel=mdr, ri_sel;
+    pop.up:
+        a_sel=5, c_in, alu_sel=ADDA, r5_write, goto fetch;
+
+    // call subroutine
+    call:
+        a_sel=7, alu_sel=ADDA, mdr_sel=LOAD_ALU;
+        result_sel=ir_const8, r7_write, goto store.writing;
+    
+    // return from subroutine
+    ret:
+        mdr_sel=LOAD_MEM, read, if wait then goto ret endif;
+        result_sel=mdr, r7_write, goto pop.up;
