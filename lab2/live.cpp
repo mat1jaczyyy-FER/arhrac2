@@ -17,19 +17,19 @@ _declspec(naked) void a(int c, int* niz, int n, int* indeksi) {
             push    ebx
             push    esi
 
-            mov     ebx, [ebp+8]
-            mov     ecx, [ebp+16]
+            mov     ebx, [ebp+12]
+            mov     ecx, [ebp+20]
             mov     [ecx], 0
             mov     edx, ecx
             add     edx, 4
             mov     eax, 0
 
         check:
-            cmp     eax, [ebp+12]
+            cmp     eax, [ebp+16]
             jge     end
 
             mov     esi, [ebx]
-            cmp     esi, [ebp+4]
+            cmp     esi, [ebp+8]
             jne     next
 
             add     [ecx], 1
