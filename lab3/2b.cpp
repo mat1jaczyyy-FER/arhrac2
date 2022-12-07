@@ -1,6 +1,5 @@
 #include <iomanip>
 #include <iostream>
-#include <string>
 #include <Windows.h>
 
 /* generated with 2a.cpp */
@@ -42,7 +41,7 @@
 #define N (200000000)
 
 // povećanje pomaka (onemogućuje pretpribavljanje)
-#define DELTA (8)      
+#define DELTA (8)
 
 typedef unsigned char byte;
 typedef unsigned int uint;
@@ -51,7 +50,7 @@ typedef struct {
     double totalTime;
     int cntAccesses;
     int sum;
-    double avgAccessTime;
+    double avgOpTime;
     double bandwidth;
 } result;
 
@@ -86,14 +85,14 @@ __forceinline result run(uint size, uint step, uint delta, const char* name) {
     delete buf;
    
     r.totalTime = (double)(end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
-    r.avgAccessTime = r.totalTime / r.cntAccesses;
+    r.avgOpTime = r.totalTime / r.cntAccesses;
     r.bandwidth = r.cntAccesses / r.totalTime;
 
     std::cout
         << std::right << std::setw(10) << std::setprecision(4) << r.totalTime * 1000 << " ms runtime,  "
         << std::right << std::setw(10) << r.cntAccesses << " accesses,  "
         << std::right << std::setw(10) << r.sum << " sum,  "
-        << std::right << std::setw(5) << std::setprecision(3) << r.avgAccessTime * 1000000000 << " ns/access (average),  "
+        << std::right << std::setw(5) << std::setprecision(3) << r.avgOpTime * 1000000000 << " ns/access (average),  "
         << std::right << std::setw(6) << std::setprecision(2) << r.bandwidth / 1000000 << " GB/s (bandwidth)"
     << std::endl;
 
